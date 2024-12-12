@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Interativo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <style>
+        #map { height: 600px; }
+        #output { margin: 10px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Mapa Interativo de ONGs e Locais Visitados</h1>
+    <div id="map"></div>
+    <div id="output">
+        <h3>Coordenadas</h3>
+        <p id="coords">Clique ou desenhe no mapa para exibir as coordenadas.</p>
+    </div>
+
+    <script>
+        const map = L.map('map').setView([-19.9, -43.9], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+
+        const drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        const drawControl = new L.Control.Draw({
+            draw: {
+                polygon: true,
+                marker: true,
+                polyline: false,
+                rectangle: false,
+                circle: false,
+                circlemarker: false
+            },
+            edit: {
+                featureGroup: drawnItems
+            }
+        });
+        map.addControl(drawControl);
+
+
+        map.on(L.Draw.Event.CREATED, function (event) {
+            const layer = event.layer;
+            drawnItems.addLayer(layer);
+
+            if (event.layerType === 'marker') {
+                const { lat, lng } = layer.getLatLng();
+                document.getElementById('coords').innerText = `Marcador criado em: ${lat.toFixed(6)} ${lng.toFixed(6)}`;
+
+                const nome = prompt('Digite o nome do local visitado:');
+                const descricao = prompt('Digite uma descrição:');
+
+                if (nome && descricao) {  // Verifica se o usuário inseriu nome e descrição
+                    fetch('http://localhost:5000/cadastrar-local', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nome, descricao, latitude: lat, longitude: lng })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data); // Exibe a resposta do servidor no console
+                        L.marker([lat, lng]).addTo(map).bindPopup(`<b>${nome}</b><br>${descricao}`);
+                         // Adiciona o marcador ao mapa após salvar com sucesso
+                    })
+                    .catch(error => {
+                        console.error("Erro ao salvar local:", error);
+                        alert("Erro ao salvar local. Verifique o console para mais detalhes.");
+                    });
+                }
+                
+
+            } else if (event.layerType === 'polygon') {
+                const coordinates = layer.getLatLngs()[0].map(coord => `${coord.lat} ${coord.lng}`).join(", ");
+                document.getElementById('coords').innerText = `Polígono desenhado: (${coordinates})`;
+                alert("Copie as coordenadas do polígono na seção 'Coordenadas' para usar no terminal.");
+
+            }
+        });
+
+        // Clique para capturar coordenadas de um ponto (fora do desenho de marcador)
+        map.on('click', function (e) {
+          if(!drawControl._toolbars.draw._activeMode) { // Verifica se a ferramenta de desenho não está ativa
+             const { lat, lng } = e.latlng;
+             document.getElementById('coords').innerText = `Ponto clicado: ${lat.toFixed(6)} ${lng.toFixed(6)}`;
+          }
+        });
+
+
+        async function carregarOngs() {
+            const response = await fetch('http://localhost:5000/ongs');
+            const ongs = await response.json();
+            ongs.forEach(ong => {
+                L.marker([ong.latitude, ong.longitude]).addTo(map).bindPopup(`<b>${ong.nome}</b><br>${ong.descricao}`);
+            });
+        }
+        
+        // Adicionar Locais Visitados ao mapa
+        async function carregarLocaisVisitados() {
+            const response = await fetch('http://localhost:5000/locais-visitados');
+            const locais = await response.json();
+
+            locais.forEach(local => {
+                L.marker([local.latitude, local.longitude])
+                    .addTo(map)
+                    .bindPopup(`<b>${local.nome}</b><br>${local.descricao}`);
+            });
+        }
+
+
+        // Inicializar ONGs e Locais Visitados no mapa
+        carregarOngs();
+        carregarLocaisVisitados(); // Chama a função para carregar os locais
+
+    </script>
+</body>
+</html>
