@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
-import requests
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -9,10 +9,10 @@ CORS(app)
 # Configuração do banco de dados
 def conectar():
     return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="Keslwywilie2004!",
-        database="ongs_db"
+        host="localhost",  # Pode ser parametrizado se necessário
+        user=os.getenv("user"),
+        password=os.getenv("password"),
+        database=os.getenv("database")
     )
 
 # 1. Cadastrar um local visitado
@@ -87,12 +87,12 @@ def ongs_poligono():
 
     return jsonify(resultados)
 
-#rota Flask para buscar os locais visitados:
+# Rota Flask para buscar os locais visitados:
 @app.route('/locais-visitados', methods=['GET'])
 def listar_locais_visitados():
     conn = conectar()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT nome, descricao, ST_X(localizacao) AS longitude, ST_Y(localizacao) AS latitude FROM locais_visitados") # Adapte o nome da tabela se necessário
+    cursor.execute("SELECT nome, descricao, ST_X(localizacao) AS longitude, ST_Y(localizacao) AS latitude FROM locais_visitados")
     resultados = cursor.fetchall()
     conn.close()
     return jsonify(resultados)
