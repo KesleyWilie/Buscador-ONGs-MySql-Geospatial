@@ -10,6 +10,7 @@ Este projeto consiste em uma aplicação web que exibe ONGs e locais visitados e
 * **Busca de ONGs por raio:**  (Implementado no backend, disponível via CLI) Permite buscar ONGs dentro de um raio específico de um ponto.
 * **Busca de ONGs por polígono:** (Implementado no backend, disponível via CLI) Permite buscar ONGs dentro de um polígono desenhado no mapa (as coordenadas do polígono devem ser copiadas e usadas na CLI).
 * **Persistência de dados:** Os locais visitados são salvos em um banco de dados MySQL e carregados no mapa quando a página é aberta.
+* **Topografia das ONGs:** Cada ONG pode ter informações sobre o tipo de topografia (por exemplo, plano, montanhoso) e a altitude, que são exibidas no mapa quando o usuário clica em um marcador.
 
 ## Tecnologias Utilizadas
 
@@ -56,7 +57,21 @@ Este projeto consiste em uma aplicação web que exibe ONGs e locais visitados e
        descricao TEXT,
        localizacao POINT NOT NULL SRID 4326,
        SPATIAL INDEX (localizacao)
+
+
+       
    );
+   
+   CREATE TABLE topografia (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    local_id INT,
+    tipo_topografia VARCHAR(255),
+    altitude DECIMAL(10, 2),
+    forma_geometrica GEOMETRY,
+    CONSTRAINT fk_local
+        FOREIGN KEY (local_id) REFERENCES locais_visitados(id)
+);
+
    ```
    * Insira alguns dados de exemplo nas tabelas, especialmente na tabela `ongs`, para que haja marcadores para visualizar no mapa.
 
