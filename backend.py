@@ -47,7 +47,7 @@ def listar_ongs():
     conn.close()
     return jsonify(resultados)
 
-# 3. Buscar ONGs dentro de um raio
+# 3. Buscar ONGs dentro de um raio(com topografia)
 @app.route('/ongs-raio', methods=['GET'])
 def ongs_raio():
     latitude = float(request.args.get('latitude'))
@@ -58,17 +58,22 @@ def ongs_raio():
     cursor = conn.cursor(dictionary=True)
     ponto = f"POINT({longitude} {latitude})"
     query = """
-    SELECT id, nome, descricao, ST_X(localizacao) AS longitude, ST_Y(localizacao) AS latitude,
-           ST_Distance_Sphere(localizacao, ST_GeomFromText(%s, 4326)) AS distancia
+    SELECT ongs.id, ongs.nome, ongs.descricao, 
+           ST_X(ongs.localizacao) AS longitude, 
+           ST_Y(ongs.localizacao) AS latitude,
+           ST_Distance_Sphere(ongs.localizacao, ST_GeomFromText(%s, 4326)) AS distancia,
+           topografia.tipo_topografia, 
+           topografia.altitude
     FROM ongs
-    WHERE ST_Distance_Sphere(localizacao, ST_GeomFromText(%s, 4326)) <= %s
+    LEFT JOIN topografia ON ongs.id = topografia.local_id
+    WHERE ST_Distance_Sphere(ongs.localizacao, ST_GeomFromText(%s, 4326)) <= %s
     """
     cursor.execute(query, (ponto, ponto, raio))
     resultados = cursor.fetchall()
     conn.close()
     return jsonify(resultados)
 
-# 4. Buscar ONGs dentro de um polígono
+# 4. Buscar ONGs dentro de um polígono(com topografia)
 @app.route('/ongs-poligono', methods=['POST'])
 def ongs_poligono():
     dados = request.json
@@ -77,9 +82,14 @@ def ongs_poligono():
     conn = conectar()
     cursor = conn.cursor(dictionary=True)
     query = """
-    SELECT id, nome, descricao, ST_X(localizacao) AS longitude, ST_Y(localizacao) AS latitude
+    SELECT ongs.id, ongs.nome, ongs.descricao, 
+           ST_X(ongs.localizacao) AS longitude, 
+           ST_Y(ongs.localizacao) AS latitude,
+           topografia.tipo_topografia, 
+           topografia.altitude
     FROM ongs
-    WHERE ST_Within(localizacao, ST_GeomFromText(%s, 4326))
+    LEFT JOIN topografia ON ongs.id = topografia.local_id
+    WHERE ST_Within(ongs.localizacao, ST_GeomFromText(%s, 4326))
     """
     cursor.execute(query, (poligono,))
     resultados = cursor.fetchall()
@@ -87,15 +97,25 @@ def ongs_poligono():
 
     return jsonify(resultados)
 
+
 # Rota Flask para buscar os locais visitados:
 @app.route('/locais-visitados', methods=['GET'])
 def listar_locais_visitados():
     conn = conectar()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT nome, descricao, ST_X(localizacao) AS longitude, ST_Y(localizacao) AS latitude FROM locais_visitados")
+    cursor.execute("""
+    SELECT lv.nome, lv.descricao, 
+           ST_X(lv.localizacao) AS longitude, 
+           ST_Y(lv.localizacao) AS latitude,
+           t.tipo_topografia, 
+           t.altitude
+    FROM locais_visitados lv
+    LEFT JOIN topografia t ON lv.id = t.local_id
+    """)
     resultados = cursor.fetchall()
     conn.close()
     return jsonify(resultados)
+
 
 # Inicializar o servidor
 if __name__ == '__main__':
