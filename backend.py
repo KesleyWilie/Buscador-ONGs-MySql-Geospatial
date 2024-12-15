@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
 import os
+import traceback
 
 app = Flask(__name__)
 CORS(app)
@@ -97,7 +98,6 @@ def ongs_poligono():
 
     return jsonify(resultados)
 
-
 # Rota Flask para buscar os locais visitados:
 @app.route('/locais-visitados', methods=['GET'])
 def listar_locais_visitados():
@@ -116,6 +116,100 @@ def listar_locais_visitados():
     conn.close()
     return jsonify(resultados)
 
+# Rota PUT para atualizar uma ONG com base na latitude e longitude
+@app.route('/atualizar-ong', methods=['PUT'])
+def atualizar_ong():
+    dados = request.json
+    latitude = dados.get('latitude')
+    longitude = dados.get('longitude')
+    nome = dados.get('nome')
+    descricao = dados.get('descricao')
+
+    # Verificar se latitude e longitude foram fornecidas
+    if not latitude or not longitude:
+        return jsonify({"error": "Latitude e Longitude devem ser fornecidas"}), 400
+
+    # Buscar o id usando a latitude e longitude
+    id = buscar_id_por_localizacao(latitude, longitude)
+    if not id:
+        return jsonify({"message": "Nenhum ponto encontrado com essas coordenadas."}), 404
+
+    try:
+        # Conectar ao banco
+        conn = conectar()
+        cursor = conn.cursor()
+
+        # Atualizar os dados com o id encontrado
+        query = "UPDATE locais_visitados SET nome=%s, descricao=%s WHERE id=%s"
+        cursor.execute(query, (nome, descricao, id))
+        conn.commit()
+        conn.close()
+
+        return jsonify({'message': f'ONG com id {id} atualizada com sucesso!'}), 200
+
+    except Exception as e:
+        import traceback
+        error_message = traceback.format_exc()
+        print("DEBUG: Traceback do erro:\n", error_message)
+        return jsonify({"error": str(e), "details": error_message}), 500
+
+# Rota DELETE para deletar uma ONG com base na latitude e longitude
+@app.route('/deletar-ong', methods=['DELETE'])
+def deletar_ong():
+    latitude = request.args.get('latitude')
+    longitude = request.args.get('longitude')
+
+    if not latitude or not longitude:
+        return jsonify({"error": "Latitude e Longitude devem ser fornecidas"}), 400
+    
+    # Buscar o id usando a latitude e longitude
+    id = buscar_id_por_localizacao(latitude, longitude)
+    if not id:
+        return jsonify({"message": "Nenhum ponto encontrado com essas coordenadas."}), 404
+
+    try:
+        # Conectar ao banco
+        conn = conectar()
+        cursor = conn.cursor()
+
+        # Usar ST_Distance com uma tolerância muito pequena
+        query = "DELETE FROM locais_visitados WHERE id=%s"
+
+        # Executar a query
+        cursor.execute(query, (id,))
+
+        conn.commit()
+        return jsonify({'message': f'ONG nas coordenadas ({latitude}, {longitude}) deletada com sucesso!'}), 200
+
+    except Exception as e:
+        import traceback
+        error_message = traceback.format_exc()
+        print("DEBUG: Traceback do erro:\n", error_message)
+        return jsonify({"error": str(e), "details": error_message}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
+        
+def buscar_id_por_localizacao(latitude, longitude):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    # Usando ST_Distance para procurar o ponto com a localização mais próxima
+    query = """
+        SELECT id FROM locais_visitados
+        WHERE ST_Distance(localizacao, ST_SRID(ST_GeomFromText(%s), 4326)) < 0.0001
+    """
+    ponto = f"POINT({latitude} {longitude})"
+    cursor.execute(query, (ponto,))
+
+    # Verificando se algum resultado foi encontrado
+    resultado = cursor.fetchone()
+    conn.close()
+
+    if resultado:
+        return resultado[0]  # Retorna o id encontrado
+    return None  # Retorna None caso não encontre nenhum ponto
 
 # Inicializar o servidor
 if __name__ == '__main__':
