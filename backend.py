@@ -124,7 +124,7 @@ def ongs_linha_raio():
     
     return jsonify(resultados)
 
-# 5. Buscar ONGs dentro de um polígono (por linha)
+# 6. Buscar ONGs dentro de um polígono (por linha)
 @app.route('/ongs-linha-poligono', methods=['POST'])
 def ongs_linha_poligono():
     dados = request.json
