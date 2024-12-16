@@ -20,16 +20,15 @@
         <h3>Coordenadas</h3>
         <p id="coords">Clique ou desenhe no mapa para exibir as coordenadas.</p>
     </div>
-
     <script>
         // Inicializa o mapa com centro e zoom definidos
         const map = L.map('map').setView([-19.9, -43.9], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
+    
         // Grupo de recursos desenhados
         const drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
-
+    
         // Configuração do controle de desenho
         const drawControl = new L.Control.Draw({
             draw: {
@@ -45,22 +44,22 @@
             }
         });
         map.addControl(drawControl);
-
+    
         // Quando um novo marcador ou polígono é desenhado
         map.on(L.Draw.Event.CREATED, function (event) {
             const layer = event.layer;
             drawnItems.addLayer(layer);
-
+    
             // Se for um marcador
             if (event.layerType === 'marker') {
                 const { lat, lng } = layer.getLatLng();
                 document.getElementById('coords').innerText = `Marcador criado em: ${lat.toFixed(6)} ${lng.toFixed(6)}`;
-
+    
                 // Solicita informações do local visitado
                 const nome = prompt('Digite o nome do local visitado:');
                 const descricao = prompt('Digite uma descrição:');
-
-                if (nome && descricao) {  // Verifica se o nome e descrição foram fornecidos
+    
+                if (nome && descricao) { // Verifica se o nome e descrição foram fornecidos
                     fetch('http://localhost:5000/cadastrar-local', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -69,14 +68,15 @@
                     .then(response => response.json())
                     .then(data => {
                         console.log(data); // Exibe a resposta do servidor no console
-                        L.marker([lat, lng]).addTo(map).bindPopup(`<b>${nome}</b><br>${descricao}`);
+                        L.marker([lat, lng], { icon: customIcon })
+                            .addTo(map)
+                            .bindPopup(`<b>${nome}</b><br>${descricao}`);
                     })
                     .catch(error => {
                         console.error("Erro ao salvar local:", error);
                         alert("Erro ao salvar local. Verifique o console para mais detalhes.");
                     });
                 }
-
             } else if (event.layerType === 'polygon') {
                 const coordinates = layer.getLatLngs()[0].map(coord => `${coord.lat} ${coord.lng}`).join(", ");
                 document.getElementById('coords').innerText = `Polígono desenhado: (${coordinates})`;
@@ -84,13 +84,21 @@
             }
         });
 
-        // Clique para capturar coordenadas de um ponto fora do desenho de marcador
+        // Clique para capturar coordenadas de um ponto fora do desenho de marcador ou em um marcador
         map.on('click', function (e) {
             if (!drawControl._toolbars.draw._activeMode) { // Verifica se a ferramenta de desenho não está ativa
                 const { lat, lng } = e.latlng;
                 document.getElementById('coords').innerText = `Ponto clicado: ${lat.toFixed(6)} ${lng.toFixed(6)}`;
             }
         });
+
+        // Adiciona evento de clique em cada marcador existente
+        function adicionarEventoNosMarcadores(marker) {
+            marker.on('click', function (e) {
+                const { lat, lng } = e.latlng;
+                document.getElementById('coords').innerText = `Marcador: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            });
+        }
 
         // Função para carregar as ONGs
         async function carregarOngs() {
@@ -104,9 +112,28 @@
                 if (ong.altitude !== null) {
                     popupContent += `<br><i>Altitude:</i> ${ong.altitude} metros`;
                 }
-                L.marker([ong.latitude, ong.longitude]).addTo(map).bindPopup(popupContent);
+
+                // Cria o marcador e adiciona ao mapa
+                const marker = L.marker([ong.latitude, ong.longitude])
+                    .addTo(map)
+                    .bindPopup(popupContent);
+
+                // Adiciona o evento de clique para mostrar as coordenadas
+                marker.on('click', function (e) {
+                    const { lat, lng } = e.latlng;
+                    document.getElementById('coords').innerText = `Marcador: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                });
             });
         }
+
+    
+        // Defina o ícone personalizado para locais visitados
+        const localVisitadoIcon = L.icon({
+            iconUrl: 'https://w7.pngwing.com/pngs/23/1018/png-transparent-location-map-marker-icon.png', // Caminho correto para a imagem do ícone
+            iconSize: [32, 32],            // Tamanho do ícone
+            iconAnchor: [16, 32],          // Posição da âncora do ícone
+            popupAnchor: [0, -32],          // Posição da âncora do popup
+        });
 
         // Função para carregar os locais visitados
         async function carregarLocaisVisitados() {
@@ -120,16 +147,23 @@
                 if (local.altitude !== null) {
                     popupContent += `<br><i>Altitude:</i> ${local.altitude} metros`;
                 }
-                L.marker([local.latitude, local.longitude])
+
+                // Cria o marcador com o ícone personalizado
+                const marker = L.marker([local.latitude, local.longitude], { icon: localVisitadoIcon })
                     .addTo(map)
                     .bindPopup(popupContent);
+
+                // Adiciona o evento de clique para mostrar as coordenadas
+                marker.on('click', function (e) {
+                    const { lat, lng } = e.latlng;
+                    document.getElementById('coords').innerText = `Marcador: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                });
             });
         }
 
         // Inicializa o carregamento das ONGs e Locais Visitados no mapa
         carregarOngs();
         carregarLocaisVisitados();
-
-    </script>
+    </script>    
 </body>
 </html>
