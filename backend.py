@@ -98,10 +98,9 @@ def ongs_poligono():
 
     return jsonify(resultados)
 
-
-#5 Buscar ONGs por Linha
-@app.route('/ongs-linha', methods=['POST'])
-def ongs_linha():
+#5 Buscar ONGs dentro de um raio (por linha)
+@app.route('/ongs-linha-raio', methods=['GET'])
+def ongs_linha_raio():
     latitude = float(request.args.get('latitude'))
     longitude = float(request.args.get('longitude'))
     raio = float(request.args.get('raio'))  #Raio em metros
@@ -110,7 +109,6 @@ def ongs_linha():
     cursor = conn.cursor(dictionary=True)
     
     #Ponto central da busca
-    
     ponto = f"POINT({longitude} {latitude})"
     
     query = """
@@ -125,8 +123,27 @@ def ongs_linha():
     conn.close()
     
     return jsonify(resultados)
-    
-    
+
+# 5. Buscar ONGs dentro de um polígono (por linha)
+@app.route('/ongs-linha-poligono', methods=['POST'])
+def ongs_linha_poligono():
+    dados = request.json
+    poligono = dados['polygon']  # Coordenadas no formato WKT
+
+    conn = conectar()
+    cursor = conn.cursor(dictionary=True)
+
+    query = """
+    SELECT linhas.id, linhas.nome, linhas.descricao,
+           ST_AsText(linhas.trajeto) AS trajeto
+    FROM linhas
+    WHERE ST_Within(linhas.trajeto, ST_GeomFromText(%s, 4326));
+    """
+    cursor.execute(query, (poligono,))
+    resultados = cursor.fetchall()
+    conn.close()
+
+    return jsonify(resultados)
 
 # Rota Flask para buscar os locais visitados:
 @app.route('/locais-visitados', methods=['GET'])
