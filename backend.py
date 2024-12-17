@@ -103,22 +103,24 @@ def ongs_poligono():
 def ongs_linha_raio():
     latitude = float(request.args.get('latitude'))
     longitude = float(request.args.get('longitude'))
-    raio = float(request.args.get('raio'))  #Raio em metros
+    raio = float(request.args.get('raio'))  # Raio em metros
     
     conn = conectar()
     cursor = conn.cursor(dictionary=True)
     
-    #Ponto central da busca
+    # Ponto central da busca
     ponto = f"POINT({longitude} {latitude})"
     
     query = """
-    SELECT id,nome,descricao,
-        ST_AsText(trajeto)AS linha,
-        ST_Distance_Sphere(trajeto, ST_GeomFromText(%s,4326)) AS distancia
+    SELECT id, nome, descricao,
+           ST_AsText(trajeto) AS linha,
+           ST_Distance(ST_Transform(trajeto, 3857), 
+                       ST_Transform(ST_GeomFromText(%s, 4326), 3857)) AS distancia
     FROM linhas
-    WHERE ST_Distance_Sphere(trajeto, ST_GeomFromText(%s,4326)) <= %s
+    WHERE ST_Distance(ST_Transform(trajeto, 3857), 
+                      ST_Transform(ST_GeomFromText(%s, 4326), 3857)) <= %s;
     """
-    cursor.execute(query,(ponto,ponto,raio))
+    cursor.execute(query, (ponto, ponto, raio))
     resultados = cursor.fetchall()
     conn.close()
     
@@ -127,23 +129,48 @@ def ongs_linha_raio():
 # 6. Buscar ONGs dentro de um polígono (por linha)
 @app.route('/ongs-linha-poligono', methods=['POST'])
 def ongs_linha_poligono():
-    dados = request.json
-    poligono = dados['polygon']  # Coordenadas no formato WKT
+    try:
+        dados = request.json
+        poligono = dados.get('polygon')
 
-    conn = conectar()
-    cursor = conn.cursor(dictionary=True)
+        # Verificar se o polígono foi fornecido
+        if not poligono:
+            return jsonify({"error": "Nenhum polígono foi fornecido"}), 400
 
-    query = """
-    SELECT linhas.id, linhas.nome, linhas.descricao,
-           ST_AsText(linhas.trajeto) AS trajeto
-    FROM linhas
-    WHERE ST_Within(linhas.trajeto, ST_GeomFromText(%s, 4326));
-    """
-    cursor.execute(query, (poligono,))
-    resultados = cursor.fetchall()
-    conn.close()
+        # Extrair os pontos do WKT e inverter lat/lon para lon/lat
+        # Formato recebido: "POLYGON((lat1 lon1, lat2 lon2, ...))"
+        try:
+            pontos = poligono.replace("POLYGON((", "").replace("))", "").split(", ")
+            coordenadas = []
+            for ponto in pontos:
+                lat, lon = map(float, ponto.split())
+                coordenadas.append(f"{lon} {lat}")  # Inverta aqui
 
-    return jsonify(resultados)
+            # Fechar o polígono (opcional, mas importante para evitar erros)
+            if coordenadas[0] != coordenadas[-1]:
+                coordenadas.append(coordenadas[0])
+
+            # Recriar o WKT com os valores invertidos
+            wkt = f"POLYGON(({', '.join(coordenadas)}))"
+        except Exception as e:
+            return jsonify({"error": f"Erro ao processar as coordenadas: {str(e)}"}), 400
+
+        # Query para buscar os dados no banco
+        print("COORDENADAS",wkt)
+        query = """
+            SELECT id, nome, descricao, ST_AsText(localizacao) as localizacao
+            FROM ongs
+            WHERE ST_Intersects(localizacao, ST_GeomFromText(%s, 4326))
+        """
+        
+        conn = conectar()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(query, (wkt,))
+        resultados = cursor.fetchall()
+
+        return jsonify(resultados)
+    except Exception as e:
+        return jsonify({"error": f"Erro ao processar o polígono: {str(e)}"}), 500
 
 # Rota Flask para buscar os locais visitados:
 @app.route('/locais-visitados', methods=['GET'])

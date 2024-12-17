@@ -15,7 +15,7 @@ connection = pymysql.connect(**db_config)
 cursor = connection.cursor()
 
 # Função para processar e inserir dados no banco
-def importar_ongs(arquivo_geojson):
+def importar_linhas(arquivo_geojson):
     with open(arquivo_geojson, 'r', encoding='utf-8') as file:
         dados = geojson.load(file)
     
@@ -24,27 +24,29 @@ def importar_ongs(arquivo_geojson):
         nome = feature['properties'].get('name', 'Sem nome')
         descricao = feature['properties'].get('description', 'Sem descrição')
         
-        # Coordenadas (POINT)
-        if 'geometry' in feature and feature['geometry']['type'] == 'Point':
-            coordenadas = feature['geometry']['coordinates']
-            latitude, longitude = coordenadas[1], coordenadas[0]  # GeoJSON usa [lon, lat]
+        # Verificar se a geometria é um polígono
+        if 'geometry' in feature and feature['geometry']['type'] == 'Polygon':
+            # Extrair as coordenadas do polígono
+            coordenadas = feature['geometry']['coordinates'][0]  # Pegando a coordenada do primeiro polígono
+            
+            # Criar a string WKT para o LINESTRING (conectar os pontos)
+            linha_wkt = "LINESTRING(" + ", ".join([f"{lon} {lat}" for lon, lat in coordenadas]) + ")"
             
             # SQL para inserir no banco
             sql = """
-                INSERT INTO ongs (nome, descricao, localizacao)
+                INSERT INTO linhas (nome, descricao, trajeto)
                 VALUES (%s, %s, ST_GeomFromText(%s, 4326))
             """
-            ponto = f"POINT({longitude} {latitude})"
-            cursor.execute(sql, (nome, descricao, ponto))
+            cursor.execute(sql, (nome, descricao, linha_wkt))
     
     connection.commit()
-    print("Dados importados com sucesso!")
+    print("Dados de linhas importados com sucesso!")
 
 # Caminho para o arquivo GeoJSON
 arquivo_geojson = "data\ongs_brasil.geojson"
 
-# Importar dados
-importar_ongs(arquivo_geojson)
+# Importar dados para a tabela linhas
+importar_linhas(arquivo_geojson)
 
 # Fechar conexão
 cursor.close()

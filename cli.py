@@ -20,14 +20,17 @@ def buscar_raio_linha():
     lat = float(input("Latitude: "))
     lon = float(input("Longitude: "))
     raio = float(input("Raio em metros: "))
-    response = requests.get(f"{BASE_URL}/ongs-raio", params={"latitude": lat, "longitude": lon, "raio": raio})
+    response = requests.get(f"{BASE_URL}/ongs-linha-raio", params={"latitude": lat, "longitude": lon, "raio": raio})
     print(response.json())
 
 def buscar_poligono_linha():
     print("Digite as coordenadas do polígono (ex: lat1 lon1, lat2 lon2, ...):")
     coords = input("Coordenadas: ").split(",")
+    # Fecha o polígono garantindo que o primeiro ponto é igual ao último
+    if coords[0] != coords[-1]:
+        coords.append(coords[0])
     wkt = f"POLYGON(({', '.join(coords)}))"
-    response = requests.post(f"{BASE_URL}/ongs-poligono", json={"polygon": wkt})
+    response = requests.post(f"{BASE_URL}/ongs-linha-poligono", json={"polygon": wkt})
     print(response.json())
 
 def atualizar_ponto():
