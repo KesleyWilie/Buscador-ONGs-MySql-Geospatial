@@ -57,9 +57,6 @@ Este projeto consiste em uma aplicação web que exibe ONGs e locais visitados e
        descricao TEXT,
        localizacao POINT NOT NULL SRID 4326,
        SPATIAL INDEX (localizacao)
-
-
-       
    );
    
    CREATE TABLE topografia (
@@ -70,10 +67,18 @@ Este projeto consiste em uma aplicação web que exibe ONGs e locais visitados e
     forma_geometrica GEOMETRY,
     CONSTRAINT fk_local
         FOREIGN KEY (local_id) REFERENCES locais_visitados(id)
-);
+   );
+
+   CREATE TABLE linhas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    trajeto LINESTRING NOT NULL SRID 4326,
+    SPATIAL INDEX (trajeto)
+   );
 
    ```
-   * Insira alguns dados de exemplo nas tabelas, especialmente na tabela `ongs`, para que haja marcadores para visualizar no mapa.
+   * Para alimentar as tabelas de ongs e de linhas basta executar os arquivos impor_ongs.py e import_lines.py localizados na pasta data.
 
 4. **Execute o servidor Flask:**
 
@@ -95,15 +100,6 @@ Este projeto consiste em uma aplicação web que exibe ONGs e locais visitados e
 3. **Siga as instruções no menu para buscar ONGs por raio ou polígono.**  Para a busca por polígono, desenhe o polígono no mapa na interface web, copie as coordenadas exibidas e cole-as na CLI.
 
 
-## Próximos Passos
-
-* Pegar as ongs via OpenStreetMap
-* Fazer novas operaçoes
-* Melhorar a interface do usuário.
-* Implementar tratamento de erros mais robusto no front-end e back-end.
-* Adicionar validação de dados no back-end.
-* Aprimorar a segurança do backend (armazenamento de senhas, etc.).
-* Adicionar mais funcionalidades, como edição e exclusão de locais visitados.
 
 ## Observações
 
