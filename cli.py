@@ -12,6 +12,9 @@ def buscar_raio():
 def buscar_poligono():
     print("Digite as coordenadas do polígono (ex: lat1 lon1, lat2 lon2, ...):")
     coords = input("Coordenadas: ").split(",")
+    # Fecha o polígono garantindo que o primeiro ponto é igual ao último
+    if coords[0] != coords[-1]:
+        coords.append(coords[0])
     wkt = f"POLYGON(({', '.join(coords)}))"
     response = requests.post(f"{BASE_URL}/ongs-poligono", json={"polygon": wkt})
     print(response.json())
@@ -38,7 +41,7 @@ def atualizar_ponto():
     lon = float(input("Longitude do ponto a atualizar: "))
     nome = input("Novo nome: ")
     descricao = input("Nova descrição: ")
-    response = requests.put(f"{BASE_URL}/atualizar-ong", json={
+    response = requests.put(f"{BASE_URL}/atualizar-local-visitado", json={
         "latitude": lat,
         "longitude": lon,
         "nome": nome,
@@ -49,7 +52,7 @@ def atualizar_ponto():
 def deletar_ponto():
     lat = float(input("Latitude do ponto a deletar: "))
     lon = float(input("Longitude do ponto a deletar: "))
-    response = requests.delete(f"{BASE_URL}/deletar-ong", params={
+    response = requests.delete(f"{BASE_URL}/deletar-local-visitado", params={
         "latitude": lat,
         "longitude": lon
     })

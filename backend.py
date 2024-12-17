@@ -79,6 +79,24 @@ def ongs_raio():
 def ongs_poligono():
     dados = request.json
     poligono = dados['polygon']  # Coordenadas no formato WKT
+    
+    # Extrair os pontos do WKT e inverter lat/lon para lon/lat
+    try:
+        pontos = poligono.replace("POLYGON((", "").replace("))", "").split(", ")
+        coordenadas = []
+        for ponto in pontos:
+            ponto = ponto.strip('()')  # Remover parênteses ao redor de cada ponto
+            lat, lon = map(float, ponto.split())  # Separar e converter corretamente
+            coordenadas.append(f"{lon} {lat}")  # Inverter para lon, lat
+
+        # Fechar o polígono (opcional, mas importante para evitar erros)
+        if coordenadas[0] != coordenadas[-1]:
+            coordenadas.append(coordenadas[0])
+
+        # Recriar o WKT com os valores invertidos
+        wkt = f"POLYGON(({', '.join(coordenadas)}))"
+    except Exception as e:
+        return jsonify({"error": f"Erro ao processar as coordenadas: {str(e)}"}), 400
 
     conn = conectar()
     cursor = conn.cursor(dictionary=True)
@@ -92,11 +110,12 @@ def ongs_poligono():
     LEFT JOIN topografia ON ongs.id = topografia.local_id
     WHERE ST_Within(ongs.localizacao, ST_GeomFromText(%s, 4326))
     """
-    cursor.execute(query, (poligono,))
+    cursor.execute(query, (wkt,))  # Usando wkt ao invés de poligono
     resultados = cursor.fetchall()
     conn.close()
 
     return jsonify(resultados)
+
 
 #5 Buscar ONGs dentro de um raio (por linha)
 @app.route('/ongs-linha-raio', methods=['GET'])
@@ -191,7 +210,7 @@ def listar_locais_visitados():
     return jsonify(resultados)
 
 # Rota PUT para atualizar uma ONG com base na latitude e longitude
-@app.route('/atualizar-ong', methods=['PUT'])
+@app.route('/atualizar-local-visitado', methods=['PUT'])
 def atualizar_ong():
     dados = request.json
     latitude = dados.get('latitude')
@@ -219,7 +238,7 @@ def atualizar_ong():
         conn.commit()
         conn.close()
 
-        return jsonify({'message': f'ONG com id {id} atualizada com sucesso!'}), 200
+        return jsonify({'message': f'Local visitado com id {id} atualizado com sucesso!'}), 200
 
     except Exception as e:
         import traceback
@@ -228,7 +247,7 @@ def atualizar_ong():
         return jsonify({"error": str(e), "details": error_message}), 500
 
 # Rota DELETE para deletar uma ONG com base na latitude e longitude
-@app.route('/deletar-ong', methods=['DELETE'])
+@app.route('/deletar-local-visitado', methods=['DELETE'])
 def deletar_ong():
     latitude = request.args.get('latitude')
     longitude = request.args.get('longitude')
@@ -253,7 +272,7 @@ def deletar_ong():
         cursor.execute(query, (id,))
 
         conn.commit()
-        return jsonify({'message': f'ONG nas coordenadas ({latitude}, {longitude}) deletada com sucesso!'}), 200
+        return jsonify({'message': f'Local visitado nas coordenadas ({latitude}, {longitude}) deletado com sucesso!'}), 200
 
     except Exception as e:
         import traceback
